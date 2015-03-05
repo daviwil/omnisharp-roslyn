@@ -71,7 +71,7 @@ namespace OmniSharp
             services.AddSingleton<IProjectSystem, MSBuildProjectSystem>();
 
             // Add the file watcher
-            services.AddSingleton<IFileSystemWatcher, FileSystemWatcherWrapper>();
+            services.AddSingleton<IFileSystemWatcher, ManualFileSystemWatcher>();
 
             // Add test command providers
             services.AddSingleton<ITestCommandProvider, AspNet5TestCommandProvider>();

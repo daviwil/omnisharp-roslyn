@@ -454,8 +454,6 @@ namespace OmniSharp.AspNet5
                 return project.ContextId;
             }
 
-            _watcher.Watch(projectFile, TriggerDependeees);
-
             // Send an InitializeMessage for each project
             var initializeMessage = new InitializeMessage
             {

@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.AspNet.Mvc;
 using Microsoft.CodeAnalysis;
@@ -27,7 +28,14 @@ namespace OmniSharp
 
                 if (symbol != null)
                 {
-                    solution = await Renamer.RenameSymbolAsync(solution, symbol, request.RenameTo, _workspace.Options);
+                    try
+                    {
+                        solution = await Renamer.RenameSymbolAsync(solution, symbol, request.RenameTo, _workspace.Options);
+                    }
+                    catch (ArgumentException e)
+                    {
+                        response.ErrorMessage = e.Message;
+                    }
                 }
 
                 var changes = new List<ModifiedFileResponse>();
@@ -39,9 +47,20 @@ namespace OmniSharp
                     foreach (var changedDocumentId in projectChange.GetChangedDocuments())
                     {
                         var changedDocument = solution.GetDocument(changedDocumentId);
-                        var changedText = await changedDocument.GetTextAsync();
-                        var modifiedFileResponse = new ModifiedFileResponse(changedDocument.FilePath, changedText.ToString());
+                        var modifiedFileResponse = new ModifiedFileResponse(changedDocument.FilePath);
 
+                        if (!request.WantsTextChanges)
+                        {
+                            var changedText = await changedDocument.GetTextAsync();
+                            modifiedFileResponse.Buffer = changedText.ToString();
+                        }
+                        else
+                        {
+                            var originalDocument = _workspace.CurrentSolution.GetDocument(changedDocumentId);
+                            var textChanges = await changedDocument.GetTextChangesAsync(originalDocument);
+                            modifiedFileResponse.Changes = await LinePositionSpanTextChange.Convert(originalDocument, textChanges);
+                        }
+                        
                         changes.Add(modifiedFileResponse);
                     }
                 }

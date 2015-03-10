@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using OmniSharp.Models;
 using OmniSharp.Services;
@@ -8,11 +10,14 @@ namespace OmniSharp.Roslyn
     {
         private readonly OmnisharpWorkspace _workspace;
         private readonly IEventEmitter _emitter;
+        private readonly ISet<WorkspaceEvent> _queue;
+        private readonly object _lock = new object();
 
         public WorkspaceEventForwarder(OmnisharpWorkspace workspace, IEventEmitter emitter)
         {
             _workspace = workspace;
             _emitter = emitter;
+            _queue = new HashSet<WorkspaceEvent>(new WorkspaceEventComparer());
             _workspace.WorkspaceChanged += OnWorkspaceChanged;
         }
 
@@ -61,7 +66,37 @@ namespace OmniSharp.Roslyn
 
             if (payload != null)
             {
-                _emitter.Emit(payload);
+                lock (_lock)
+                {
+                    var removed = _queue.Remove(payload);
+                    _queue.Add(payload);
+                    if (!removed)
+                    {
+                        Task.Factory.StartNew(async () =>
+                        {
+                            await Task.Delay(500);
+                            
+                            lock (_lock)
+                            {
+                                _queue.Remove(payload);
+                                _emitter.Emit(payload);
+                            }
+                        });
+                    }
+                }
+            }
+        }
+
+        private class WorkspaceEventComparer : IEqualityComparer<WorkspaceEvent>
+        {
+            public bool Equals(WorkspaceEvent a, WorkspaceEvent b)
+            {
+                return a.Kind == b.Kind && a.FileName == b.FileName;
+            }
+
+            public int GetHashCode(WorkspaceEvent obj)
+            {
+                return obj.Kind.GetHashCode() * 23 + obj.FileName.GetHashCode();
             }
         }
     }

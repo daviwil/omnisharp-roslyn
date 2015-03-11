@@ -1,10 +1,8 @@
-using OmniSharp.Models;
-
 namespace OmniSharp.Services
 {
     public class NullEventEmitter : IEventEmitter
     {
-        public void Emit(WorkspaceEvent e)
+        public void Emit(string kind, object args)
         {
             // nothing
         }

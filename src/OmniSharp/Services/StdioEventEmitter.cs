@@ -1,4 +1,3 @@
-using OmniSharp.Models;
 using OmniSharp.Stdio.Protocol;
 using OmniSharp.Stdio.Services;
 
@@ -13,12 +12,12 @@ namespace OmniSharp.Services
             _writer = writer;
         }
 
-        public void Emit(WorkspaceEvent evt)
+        public void Emit(string kind, object args)
         {
             _writer.WriteLineAsync(new EventPacket()
             {
-                Event = evt.Kind,
-                Body = evt
+                Event = kind,
+                Body = args
             });
         }
     }

@@ -93,7 +93,7 @@ namespace OmniSharp
                 services.AddSingleton<IEventEmitter, NullEventEmitter>();
             }
 
-            services.AddSingleton<WorkspaceEventForwarder, WorkspaceEventForwarder>();
+            services.AddSingleton<ProjectEventForwarder, ProjectEventForwarder>();
 
             // Setup the options from configuration
             services.Configure<OmniSharpOptions>(Configuration);
@@ -128,7 +128,7 @@ namespace OmniSharp
             logger.WriteInformation($"Omnisharp server running on port '{env.Port}' at location '{env.Path}' on host {env.HostPID}.");
             
             // Forward workspace events
-            app.ApplicationServices.GetRequiredService<WorkspaceEventForwarder>();
+            app.ApplicationServices.GetRequiredService<ProjectEventForwarder>();
 
             // Initialize everything!
             var projectSystems = app.ApplicationServices.GetRequiredService<IEnumerable<IProjectSystem>>();

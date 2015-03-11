@@ -300,6 +300,8 @@ namespace OmniSharp.AspNet5
                         // The sources to feed to the language service
                         var val = m.Payload.ToObject<SourcesMessage>();
 
+                        project.SourceFiles = val.Files;
+
                         var frameworkProject = project.ProjectsByFramework[val.Framework.FrameworkName];
                         var projectId = frameworkProject.ProjectId;
 

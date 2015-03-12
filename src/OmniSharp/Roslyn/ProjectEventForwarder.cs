@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
@@ -15,7 +14,7 @@ namespace OmniSharp.Roslyn
         private readonly MSBuildContext _msbuildContext;
         private readonly OmnisharpWorkspace _workspace;
         private readonly IEventEmitter _emitter;
-        private readonly ISet<Tuple<string, WorkspaceChangeKind>> _queue = new HashSet<Tuple<string, WorkspaceChangeKind>>();
+        private readonly ISet<SimpleWorkspaceEvent> _queue = new HashSet<SimpleWorkspaceEvent>();
         private readonly object _lock = new object();
 
         public ProjectEventForwarder(AspNet5Context aspnet5Context, MSBuildContext msbuildContext, OmnisharpWorkspace workspace, IEventEmitter emitter)
@@ -30,26 +29,26 @@ namespace OmniSharp.Roslyn
         private void OnWorkspaceChanged(object source, WorkspaceChangeEventArgs args)
         {
 
-            Tuple<string, WorkspaceChangeKind> fileNameAndEventKind = null;
+            SimpleWorkspaceEvent e = null;
 
             switch (args.Kind)
             {
                 case WorkspaceChangeKind.ProjectAdded:
                 case WorkspaceChangeKind.ProjectChanged:
                 case WorkspaceChangeKind.ProjectReloaded:
-                    fileNameAndEventKind = Tuple.Create(args.NewSolution.GetProject(args.ProjectId).FilePath, args.Kind);
+                    e = new SimpleWorkspaceEvent(args.NewSolution.GetProject(args.ProjectId).FilePath, args.Kind);
                     break;
                 case WorkspaceChangeKind.ProjectRemoved:
-                    fileNameAndEventKind = Tuple.Create(args.OldSolution.GetProject(args.ProjectId).FilePath, args.Kind);
+                    e = new SimpleWorkspaceEvent(args.OldSolution.GetProject(args.ProjectId).FilePath, args.Kind);
                     break;
             }
 
-            if (fileNameAndEventKind != null)
+            if (e != null)
             {
                 lock (_lock)
                 {
-                    var removed = _queue.Remove(fileNameAndEventKind);
-                    _queue.Add(fileNameAndEventKind);
+                    var removed = _queue.Remove(e);
+                    _queue.Add(e);
                     if (!removed)
                     {
                         Task.Factory.StartNew(async () =>
@@ -58,14 +57,14 @@ namespace OmniSharp.Roslyn
 
                             lock (_lock)
                             {
-                                _queue.Remove(fileNameAndEventKind);
+                                _queue.Remove(e);
 
                                 object payload = null;
-                                if (fileNameAndEventKind.Item2 != WorkspaceChangeKind.ProjectRemoved)
+                                if (e.Kind != WorkspaceChangeKind.ProjectRemoved)
                                 {
-                                    payload = GetProjectInformation(fileNameAndEventKind.Item1);
+                                    payload = GetProjectInformation(e.FileName);
                                 }
-                                _emitter.Emit(fileNameAndEventKind.Item2.ToString(), payload);
+                                _emitter.Emit(e.Kind.ToString(), payload);
                             }
                         });
                     }
@@ -83,6 +82,30 @@ namespace OmniSharp.Roslyn
                 MsBuildProject = msBuildContextProject != null ? new MSBuildProject(msBuildContextProject) : null,
                 AspNet5Project = aspNet5ContextProject != null ? new AspNet5Project(aspNet5ContextProject) : null
             };
+        }
+
+
+        private class SimpleWorkspaceEvent
+        {
+            public string FileName { get; private set; }
+            public WorkspaceChangeKind Kind { get; private set; }
+
+            public SimpleWorkspaceEvent(string fileName, WorkspaceChangeKind kind)
+            {
+                FileName = fileName;
+                Kind = kind;
+            }
+
+            public override bool Equals(object obj)
+            {
+                var other = obj as SimpleWorkspaceEvent;
+                return other != null && Kind == other.Kind && FileName == other.FileName;
+            }
+
+            public override int GetHashCode()
+            {
+                return Kind.GetHashCode() * 23 + FileName.GetHashCode();
+            }
         }
     }
 }
